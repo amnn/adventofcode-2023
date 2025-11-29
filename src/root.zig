@@ -1,8 +1,14 @@
 const std = @import("std");
+pub const scan = @import("./scan.zig");
 
 const Limit = std.Io.Limit;
 const Reader = std.Io.Reader;
 const Writer = std.Io.Writer;
+
+test {
+    // This is necessary for the test build to pick up all tests in imported/re-exported modules.
+    @import("std").testing.refAllDeclsRecursive(@This());
+}
 
 /// Read a line from `Reader` `r`, as long as it fits into the reader's
 /// internal buffer.
