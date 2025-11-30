@@ -38,6 +38,18 @@ const Game = struct {
         } else true;
     }
 
+    fn minCubes(self: *const Game) Round {
+        var min = Round{};
+
+        for (self.rounds) |round| {
+            min.r = @max(min.r, round.r);
+            min.g = @max(min.g, round.g);
+            min.b = @max(min.b, round.b);
+        }
+
+        return min;
+    }
+
     fn deinit(self: *Game, a: Allocator) void {
         a.free(self.rounds);
     }
@@ -66,6 +78,10 @@ const Round = struct {
 
         return round;
     }
+
+    fn power(self: *const Round) u64 {
+        return self.r * self.g * self.b;
+    }
 };
 
 const Color = enum {
@@ -84,6 +100,7 @@ pub fn main() !void {
     const a = fba.allocator();
 
     var part1: u64 = 0;
+    var part2: u64 = 0;
     while (true) {
         var game = Game.parse(stdin, a) catch break;
         defer game.deinit(a);
@@ -92,8 +109,11 @@ pub fn main() !void {
             part1 += game.id;
         }
 
+        part2 += game.minCubes().power();
+
         scan.prefix(stdin, "\n") catch break;
     }
 
     std.debug.print("Part 1: {d}\n", .{part1});
+    std.debug.print("Part 2: {d}\n", .{part2});
 }
