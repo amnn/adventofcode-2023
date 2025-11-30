@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
-    for (1..2) |i| {
+    for (1..3) |i| {
         const name = std.fmt.allocPrint(b.allocator, "day{d:02}", .{i}) catch unreachable;
         const file = std.fmt.allocPrint(b.allocator, "src/day/{d:02}.zig", .{i}) catch unreachable;
         const desc = std.fmt.allocPrint(b.allocator, "Run solution for Day {d}", .{i}) catch unreachable;
