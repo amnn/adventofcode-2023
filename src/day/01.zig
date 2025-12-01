@@ -32,7 +32,7 @@ pub fn main() !void {
 
     var part1: u64 = 0;
     var part2: u64 = 0;
-    while (try lib.readLine(stdin)) |l| {
+    while (try lib.readLineInclusive(stdin)) |l| {
         part1 += try calibrationPart1(l);
         part2 += try calibrationPart2(l);
     }
