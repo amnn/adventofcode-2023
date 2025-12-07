@@ -67,7 +67,7 @@ const Card = struct {
         };
     }
 
-    fn value(self: Card) u64 {
+    fn matches(self: Card) u64 {
         var count: u64 = 0;
         var i: usize = 0;
         var j: usize = 0;
@@ -83,6 +83,11 @@ const Card = struct {
             }
         }
 
+        return count;
+    }
+
+    fn value(self: Card) u64 {
+        const count = self.matches();
         if (count == 0) {
             return 0;
         } else {
@@ -103,18 +108,36 @@ pub fn main() !void {
 
     var buf: [4 * 1024 * 1024]u8 = undefined;
     var fba = heap.FixedBufferAllocator.init(&buf);
+    const alloc = fba.allocator();
 
+    var counts: ArrayList(u64) = try .initCapacity(alloc, 0);
+    defer counts.deinit(alloc);
+
+    var i: u64 = 0;
     var part1: u64 = 0;
-    while (true) {
-        var card = Card.parse(stdin, fba.allocator()) catch |e| if (e == error.NoMatch) break else return e;
+    var part2: u64 = 0;
+    while (true) : (i += 1) {
+        var card = Card.parse(stdin, fba.allocator()) catch |e|
+            if (e == error.NoMatch) break else return e;
         defer card.deinit(fba.allocator());
 
+        const hi = i + card.matches();
+        while (counts.items.len <= hi) {
+            try counts.append(alloc, 1);
+        }
+
+        var j = i + 1;
+        const extra = counts.items[i];
+        while (j <= hi) : (j += 1) {
+            counts.items[j] += extra;
+        }
+
         part1 += card.value();
-        scan.prefix(stdin, "\n") catch {
-            std.debug.print("End of input\n", .{});
-            break;
-        };
+        part2 += extra;
+
+        scan.prefix(stdin, "\n") catch break;
     }
 
     std.debug.print("Part 1: {d}\n", .{part1});
+    std.debug.print("Part 2: {d}\n", .{part2});
 }
