@@ -1,6 +1,7 @@
 const std = @import("std");
 const lib = @import("lib");
 
+const atomic = std.atomic;
 const math = std.math;
 const scan = lib.scan;
 const sort = std.sort;
@@ -9,7 +10,9 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const File = std.fs.File;
 const FixedBufferAllocator = std.heap.FixedBufferAllocator;
+const Pool = std.Thread.Pool;
 const Reader = std.io.Reader;
+const WaitGroup = std.Thread.WaitGroup;
 
 const Almanac = struct {
     seed_to_soil: Map,
@@ -155,6 +158,58 @@ const Range = struct {
     }
 };
 
+fn SliceIter(comptime T: type) type {
+    return struct {
+        slice: []const T,
+
+        const Self = @This();
+
+        pub fn init(slice: []const T) Self {
+            return .{ .slice = slice };
+        }
+
+        pub fn next(self: *Self) ?T {
+            if (self.slice.len == 0) {
+                return null;
+            } else {
+                const val = self.slice[0];
+                self.slice = self.slice[1..];
+                return val;
+            }
+        }
+    };
+}
+
+const RangeIter = struct {
+    lo: u64,
+    hi: u64,
+
+    fn init(lo: u64, hi: u64) RangeIter {
+        return .{ .lo = lo, .hi = hi };
+    }
+
+    fn next(self: *RangeIter) ?u64 {
+        if (self.lo >= self.hi) {
+            return null;
+        } else {
+            const val = self.lo;
+            self.lo += 1;
+            return val;
+        }
+    }
+
+    fn nextChunk(self: *RangeIter, sz: u64) ?RangeIter {
+        if (self.lo >= self.hi) {
+            return null;
+        } else {
+            const lo = self.lo;
+            const hi = @min(self.lo + sz, self.hi);
+            self.lo = hi;
+            return .{ .lo = lo, .hi = hi };
+        }
+    }
+};
+
 pub fn main() !void {
     var input: [4096]u8 = undefined;
     var reader = File.stdin().reader(&input);
@@ -171,12 +226,42 @@ pub fn main() !void {
     var almanac: Almanac = try .parse(stdin, alloc);
     defer almanac.deinit(alloc);
 
-    var part1: u64 = math.maxInt(u64);
-    for (seeds) |seed| {
-        part1 = @min(part1, almanac.seedToLocation(seed));
+    const part1 = minLocation(&almanac, SliceIter(u64).init(seeds));
+    std.debug.print("Part 1: {d}\n", .{part1});
+    std.debug.print("Part 2: {d}\n", .{try part2(alloc, &almanac, seeds)});
+}
+
+fn part2(alloc: Allocator, almanac: *Almanac, seeds: []const u64) !u64 {
+    var pool: Pool = undefined;
+    var group: WaitGroup = .{};
+    var result: atomic.Value(u64) = .init(math.maxInt(u64));
+
+    try pool.init(.{ .allocator = alloc });
+    defer pool.deinit();
+
+    const Worker = struct {
+        fn do(a: *Almanac, s: RangeIter, r: *atomic.Value(u64)) void {
+            const min = minLocation(a, s);
+            _ = r.fetchMin(min, .monotonic);
+        }
+    };
+
+    std.debug.print("Spawning", .{});
+    var iter: SliceIter(u64) = .init(seeds);
+    while (true) {
+        const lo = iter.next() orelse break;
+        const sz = iter.next() orelse break;
+
+        var range: RangeIter = .init(lo, lo + sz);
+        while (range.nextChunk(100_000_000)) |chunk| {
+            std.debug.print(".", .{});
+            pool.spawnWg(&group, Worker.do, .{ almanac, chunk, &result });
+        }
     }
 
-    std.debug.print("Part 1: {d}\n", .{part1});
+    std.debug.print("\n", .{});
+    pool.waitAndWork(&group);
+    return result.load(.monotonic);
 }
 
 fn parseSeeds(r: *Reader, alloc: Allocator) ![]u64 {
@@ -191,4 +276,14 @@ fn parseSeeds(r: *Reader, alloc: Allocator) ![]u64 {
     }
 
     return try seeds.toOwnedSlice(alloc);
+}
+
+fn minLocation(almanac: *Almanac, seeds: anytype) u64 {
+    var min: u64 = math.maxInt(u64);
+    var seeds_ = seeds;
+    while (seeds_.next()) |seed| {
+        min = @min(min, almanac.seedToLocation(seed));
+    }
+
+    return min;
 }
