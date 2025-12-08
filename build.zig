@@ -6,7 +6,7 @@ pub fn build(b: *std.Build) void {
 
     const lib = b.dependency("libadvent", .{}).module("libadvent");
 
-    for (1..6) |i| {
+    for (1..7) |i| {
         const name = std.fmt.allocPrint(b.allocator, "day{d:02}", .{i}) catch unreachable;
         const file = std.fmt.allocPrint(b.allocator, "src/day/{d:02}.zig", .{i}) catch unreachable;
         const desc = std.fmt.allocPrint(b.allocator, "Run solution for Day {d}", .{i}) catch unreachable;
